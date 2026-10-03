@@ -1,0 +1,51 @@
+<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>LGschedule Admin</title>
+<style>body{margin:0;padding:16px;background:#0E0E14;color:#ECEAF4;font:13px/1.5 -apple-system,system-ui,sans-serif}a{color:#B695FF}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:5px 8px;border-bottom:1px solid #2C2C3C}th{color:#8C89A3}
+.st{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.st div{background:#1C1C28;border-radius:12px;padding:10px 16px}.st b{display:block;font-size:22px}
+input{background:#1C1C28;color:#ECEAF4;border:1px solid #2C2C3C;border-radius:8px;padding:8px;width:100%;margin:8px 0}
+button{background:#1C1C28;color:#ECEAF4;border:1px solid #2C2C3C;border-radius:8px;padding:6px 12px;margin-right:6px;cursor:pointer}button.on{background:#6D3FE0}
+#log{background:#08080c;border-radius:10px;padding:10px;height:50vh;overflow:auto;font:12px monospace;white-space:pre-wrap}
+.ok{color:#5ee3a1}.error{color:#ff6b7a}.info{color:#b695ff}.warn{color:#F6C343}</style>
+<style>
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes flow{0%{background-position:0 50%}100%{background-position:200% 50%}}
+@keyframes bob{50%{transform:translateY(-8px)}}
+@keyframes glow{50%{box-shadow:0 0 0 6px #8B5CF622,0 8px 30px #8B5CF633}}
+@keyframes shine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+main>div>*,#app>*{animation:up .6s cubic-bezier(.2,.7,.2,1) both}
+main>div>*:nth-child(2){animation-delay:.08s}main>div>*:nth-child(3){animation-delay:.16s}main>div>*:nth-child(4){animation-delay:.24s}main>div>*:nth-child(n+5){animation-delay:.32s}
+.grid>.card{animation:up .6s both}.grid>.card:nth-child(2){animation-delay:.1s}.grid>.card:nth-child(3){animation-delay:.2s}
+h1 em{background-size:200% auto;animation:flow 6s linear infinite}
+.card{transition:transform .25s,border-color .25s,box-shadow .25s}.card:hover{transform:translateY(-3px);box-shadow:0 14px 40px #8B5CF622}
+.phone{animation:bob 5s ease-in-out infinite,glow 4s ease-in-out infinite}
+button{transition:transform .15s,filter .15s,box-shadow .2s;box-shadow:0 4px 14px #6D3FE044}button:hover{transform:translateY(-1px)}button:active{transform:scale(.96)}
+.row{transition:background .2s,transform .2s}.row:hover{background:rgba(255,255,255,.08);transform:translateX(3px)}
+.live{animation:glow 3s ease-in-out infinite}.ring i{transition:width .8s cubic-bezier(.2,.7,.2,1);position:relative;overflow:hidden}.ring i:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff6,transparent);animation:shine 2s infinite}
+input:focus,textarea:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px #8B5CF633}input,textarea{transition:border-color .2s,box-shadow .2s}
+.stp{transition:all .3s}.stp.done{box-shadow:0 0 18px #5ee3a122}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<a href=/>← Back</a><h2>Users <span id=n></span></h2><div class=st id=s></div><div style="overflow:auto"><table id=u></table></div>
+<h2>System check</h2><button id=hc>Run check</button><pre id=hr style="white-space:pre-wrap"></pre>
+<h2>Live log</h2><button data-l="" class=on>All</button><button data-l=ok>OK</button><button data-l=error>Errors</button><button data-l=info>Info</button><button data-l=warn>Warn</button><button data-l=debug>Debug</button><button id=dl>Download log</button><button id=ps>Pause</button>
+<input id=q placeholder="Filter by user name…"><div id=log></div>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),$=s=>document.querySelector(s),
+ago=t=>t?(d=>d<90?d+'s ago':d<5400?Math.round(d/60)+'m ago':Math.round(d/3600)+'h ago')(Math.round((Date.now()-t)/1000)):'never',
+left=e=>{if(!e)return'-';const d=(Date.parse(e)-Date.now())/864e5;return d<0?'expired':d.toFixed(1)+' days'};
+let since=0,all=[],lvl='',paused=false;
+async function users(){const r=await fetch('/api/admin/users');if(!r.ok){document.body.innerHTML='Admins only. <a href=/>Back</a>';return}
+ const {users}=await r.json(),c=k=>users.filter(x=>x.status===k).length,hr=all.filter(e=>e.level==='ok'&&Date.now()-e.t<36e5).length;$('#n').textContent='('+users.length+')';
+ $('#s').innerHTML=`<div><b class=ok>${c('ok')}</b>working</div><div><b class=error>${c('expired')}</b>expired</div><div><b class=error>${c('error')}</b>errors</div><div><b>${users.filter(x=>!x.hasCookie).length}</b>no token</div><div><b>${hr}</b>fetches (last hr, shown)</div>`;
+ $('#u').innerHTML='<tr><th>Google name<th>Username<th>Email<th>Status<th>Token<th>Expires in<th>Last fetch<th>Last seen<th></tr>'+users.map(x=>`<tr><td><b>${esc(x.name)}</b><td>${esc(String(x.email).split('@')[0])}<td>${esc(x.email)}<td class=${x.status==='ok'?'ok':'error'}>${esc(x.status||'new')}<td>${x.hasCookie?'yes':'no'}<td>${left(x.expires)}<td>${ago(x.lastFetch)}<td>${ago(x.lastSeen)}<td><button data-e="${esc(x.email)}">Test</button>`).join('')}
+function paint(){const q=$('#q').value.toLowerCase(),el=$('#log'),bot=el.scrollTop+el.clientHeight>=el.scrollHeight-20;
+ el.innerHTML=all.filter(e=>e.user.toLowerCase().includes(q)&&(!lvl||e.level===lvl)).map(e=>`<span class=${esc(e.level)}>${new Date(e.t).toLocaleTimeString()} [${esc(e.user)}] ${esc(e.msg)}${e.ms!=null?' ('+e.ms+'ms)':''}</span>`).join('\n');if(bot)el.scrollTop=el.scrollHeight}
+async function tick(){if(paused)return;try{const {logs}=await (await fetch('/api/admin/logs?since='+since)).json();if(logs.length){since=logs[logs.length-1].id;all=all.concat(logs).slice(-1000);paint()}}catch{}}
+document.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>{lvl=b.dataset.l;document.querySelectorAll('[data-l]').forEach(x=>x.className=x===b?'on':'');paint()});
+$('#ps').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause'};$('#u').onclick=async e=>{const em=e.target.dataset.e;if(!em)return;e.target.textContent='...';const r=await(await fetch('/api/admin/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:em})})).json();
+ e.target.textContent=r.ok?'OK '+r.blocks+' blocks '+r.ms+'ms':'Failed: '+(r.error||'?');setTimeout(()=>{e.target.textContent='Test'},6000)};
+$('#hc').onclick=async()=>{$('#hr').textContent='Checking...';const h=await(await fetch('/api/admin/health')).json();
+ $('#hr').textContent=`Database: ${h.db?'OK':'FAILED'} (${h.dbMs}ms)${h.dbErr?' - '+h.dbErr:''}\nFlex: ${h.flex} (${h.flexMs}ms)\nMissing env vars: ${h.missingEnv.length?h.missingEnv.join(', '):'none'}\nNode ${h.node}, region ${h.region||'?'}, DEBUG_LOGS ${h.debugLogs?'on':'off'}`};
+$('#dl').onclick=()=>{const b=new Blob([all.map(e=>`${new Date(e.t).toISOString()} ${e.level} [${e.user}] ${e.msg}${e.ms!=null?' ('+e.ms+'ms)':''}`).join('\n')],{type:'text/plain'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='lgschedule-log.txt';a.click()};
+$('#q').oninput=paint;$('#hc').click();users();tick();setInterval(tick,2000);setInterval(users,15000);
+</script></html>

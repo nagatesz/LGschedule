@@ -1,0 +1,466 @@
+// Schedule widget for Scriptable
+// Tap opens the controller dashboard. Day switching is handled server-side
+// by the server, so this script never needs a ?date= of its own.
+
+const SITE = "https://schedule-api-eta.vercel.app/";
+const API = "https://schedule-api-eta.vercel.app/api/schedule";
+
+// Lunch isn't in the Flex feed, so we carve it out directly in the widget
+// to match the website controller.
+const LUNCH = { name: "Lunch", start: "12:13", end: "12:43" };
+
+const BG = new Color("#0E0E14");
+const CARD = new Color("#1C1C28");
+const LINE = new Color("#2C2C3C");
+const ACCENT = new Color("#8B5CF6");
+const ACCENT_SOFT = new Color("#B695FF");
+const TEXT = new Color("#ECEAF4");
+const MUTED = new Color("#8C89A3");
+const DIM = new Color("#5B5872");
+const AMBER = new Color("#F6C343");
+const WHITE = new Color("#FFFFFF");
+
+// ---------------------------------------------------------------- time
+
+function toMinutes(hhmm) {
+  const m = String(hhmm || "").trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  if (h < 6) h += 12;
+  return h * 60 + parseInt(m[2], 10);
+}
+
+function clockLabel(mins) {
+  let h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return h + ":" + String(m).padStart(2, "0") + " " + ampm;
+}
+
+function shortLabel(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return (h % 12 || 12) + ":" + String(m).padStart(2, "0");
+}
+
+function nowMinutes() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+}
+
+function gapText(mins) {
+  const n = Math.max(0, Math.ceil(mins));
+  if (n >= 60) {
+    const h = Math.floor(n / 60);
+    const r = n % 60;
+    return r ? h + "h " + r + "m" : h + "h";
+  }
+  return n + "m";
+}
+
+// ---------------------------------------------------------------- data
+
+function cleanTitle(t) {
+  if (!t) return null;
+  return String(t)
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/\s*SN:\S+/gi, "")
+    .replace(/\s*Per:\S+/gi, "")
+    .trim();
+}
+
+function shapeBlock(b) {
+  const s = toMinutes(b.start);
+  let e = toMinutes(b.end);
+  if (s === null || e === null) return null;
+  if (e < s) e += 720;
+  const cls = (b.classes || [])[0] || null;
+  const title = cls ? cleanTitle(cls.title) : null;
+  return {
+    name: b.name || "Block",
+    start: s,
+    end: e,
+    title: title && title.toLowerCase() !== String(b.name || "").toLowerCase() ? title : null,
+    room: cls ? cls.room : null,
+    teacher: cls && cls.teachers && cls.teachers[0] ? cls.teachers[0].name : null
+  };
+}
+
+function carveLunch(list) {
+  if (!LUNCH || !list.length) return list;
+  const ls = toMinutes(LUNCH.start), le = toMinutes(LUNCH.end);
+  if (ls === null || le === null || le <= ls) return list;
+
+  if (list.some(b => /lunch/i.test(b.name) || b.start === ls)) return list;
+  if (ls < list[0].start || le > list[list.length - 1].end) return list;
+
+  const lunch = { name: LUNCH.name, start: ls, end: le, title: null, room: null, teacher: null };
+  const out = [];
+  let placed = false;
+
+  list.forEach(b => {
+    if (b.start >= le || b.end <= ls) { out.push(b); return; }
+    if (ls - b.start >= 2) out.push(Object.assign({}, b, { end: ls }));
+    if (!placed) { out.push(lunch); placed = true; }
+    if (b.end - le >= 2) out.push(Object.assign({}, b, { start: le }));
+  });
+
+  if (!placed) out.push(lunch);
+  out.sort((a, b) => a.start - b.start);
+  return out;
+}
+
+async function loadSchedule() {
+  // Add timestamp query to bypass iOS HTTP caching
+  const req = new Request(API + "?_t=" + Date.now());
+  req.timeoutInterval = 12;
+  const json = await req.loadJSON();
+  const raw = json.all_blocks || json.blocks || [];
+  const blocks = carveLunch(raw.map(shapeBlock).filter(b => b !== null).sort((a, b) => a.start - b.start));
+  return {
+    date: json.date || null,
+    letter: json.letter_day || json.day || null,
+    blocks: blocks
+  };
+}
+
+function resolveNow(data) {
+  const n = nowMinutes();
+  const active = data.blocks.find(b => n >= b.start && n < b.end) || null;
+  const upcoming = data.blocks.filter(b => b.start > n);
+  return { now: n, active: active, next: upcoming[0] || null, upcoming: upcoming };
+}
+
+function subtitle(b) {
+  const bits = [];
+  if (b.title) bits.push(b.title);
+  if (b.room) bits.push(/^\d/.test(String(b.room).trim()) ? "Room " + b.room : b.room);
+  return bits.join(" · ");
+}
+
+// ---------------------------------------------------------------- pieces
+
+function heroGradient() {
+  const g = new LinearGradient();
+  g.colors = [new Color("#251A46"), new Color("#5B34B8")];
+  g.locations = [0, 1];
+  g.startPoint = new Point(0, 0);
+  g.endPoint = new Point(1, 1);
+  return g;
+}
+
+function amberGradient() {
+  const g = new LinearGradient();
+  g.colors = [new Color("#2B2410"), new Color("#4A3A1A")];
+  g.locations = [0, 1];
+  g.startPoint = new Point(0, 0);
+  g.endPoint = new Point(1, 1);
+  return g;
+}
+
+function addLine(stack, text, font, color, limit) {
+  const t = stack.addText(text);
+  t.font = font;
+  t.textColor = color;
+  t.lineLimit = limit || 1;
+  t.minimumScaleFactor = 0.7;
+  return t;
+}
+
+function dayHeader(widget, data, small) {
+  const row = widget.addStack();
+  row.layoutHorizontally();
+  row.centerAlignContent();
+
+  if (data.letter) {
+    const badge = row.addStack();
+    badge.setPadding(3, 7, 3, 7);
+    badge.cornerRadius = 7;
+    badge.backgroundColor = new Color("#251A46");
+    badge.borderWidth = 1;
+    badge.borderColor = new Color("#8B5CF6", 0.5);
+    addLine(badge, data.letter, Font.boldSystemFont(11), ACCENT_SOFT);
+    row.addSpacer(7);
+  }
+
+  const d = data.date ? new Date(data.date + "T00:00:00") : new Date();
+  const fmt = new DateFormatter();
+  fmt.dateFormat = small ? "EEE d" : "EEEE, MMM d";
+  addLine(row, fmt.string(d), Font.semiboldSystemFont(small ? 11 : 12), MUTED);
+
+  row.addSpacer();
+  return row;
+}
+
+function rightText(stack, text, font, color) {
+  const t = stack.addText(text);
+  t.font = font;
+  t.textColor = color;
+  t.lineLimit = 1;
+  t.rightAlignText();
+  return t;
+}
+
+function heroCard(widget, state, compact) {
+  const card = widget.addStack();
+  card.layoutVertically();
+  card.setPadding(compact ? 10 : 13, compact ? 11 : 14, compact ? 10 : 13, compact ? 11 : 14);
+  card.cornerRadius = 15;
+
+  if (state.active) {
+    card.backgroundGradient = heroGradient();
+    addLine(card, "In session", Font.semiboldSystemFont(10), new Color("#FFFFFF", 0.62));
+    card.addSpacer(3);
+    addLine(card, state.active.name, Font.boldSystemFont(compact ? 17 : 20), WHITE);
+    const sub = subtitle(state.active);
+    if (sub) {
+      card.addSpacer(1);
+      addLine(card, sub, Font.systemFont(compact ? 10 : 11), new Color("#FFFFFF", 0.78));
+    }
+    card.addSpacer(compact ? 5 : 7);
+
+    const row = card.addStack();
+    row.layoutHorizontally();
+    row.bottomAlignContent();
+    addLine(row, gapText(state.active.end - state.now), Font.boldSystemFont(compact ? 24 : 30), WHITE);
+    row.addSpacer(5);
+    const tail = row.addStack();
+    tail.layoutVertically();
+    tail.addSpacer(compact ? 3 : 5);
+    addLine(tail, "left, ends " + clockLabel(state.active.end), Font.systemFont(10), new Color("#FFFFFF", 0.62));
+    row.addSpacer();
+
+  } else if (state.next) {
+    card.backgroundGradient = amberGradient();
+    addLine(card, "Up next", Font.semiboldSystemFont(10), AMBER);
+    card.addSpacer(3);
+    addLine(card, state.next.name, Font.boldSystemFont(compact ? 17 : 20), TEXT);
+    const sub = subtitle(state.next);
+    if (sub) {
+      card.addSpacer(1);
+      addLine(card, sub, Font.systemFont(compact ? 10 : 11), new Color("#FFFFFF", 0.7));
+    }
+    card.addSpacer(compact ? 5 : 7);
+
+    const row = card.addStack();
+    row.layoutHorizontally();
+    row.bottomAlignContent();
+    addLine(row, gapText(state.next.start - state.now), Font.boldSystemFont(compact ? 24 : 30), TEXT);
+    row.addSpacer(5);
+    const tail = row.addStack();
+    tail.layoutVertically();
+    tail.addSpacer(compact ? 3 : 5);
+    addLine(tail, "until it starts, " + clockLabel(state.next.start), Font.systemFont(10), new Color("#FFFFFF", 0.6));
+    row.addSpacer();
+
+  } else {
+    card.backgroundColor = CARD;
+    addLine(card, "Day finished", Font.semiboldSystemFont(10), MUTED);
+    card.addSpacer(3);
+    addLine(card, "School's out", Font.boldSystemFont(compact ? 17 : 20), TEXT);
+  }
+
+  return card;
+}
+
+function blockRow(widget, b, state) {
+  const past = state.now >= b.end;
+  const live = state.active && b.start === state.active.start && b.end === state.active.end;
+
+  const row = widget.addStack();
+  row.layoutHorizontally();
+  row.centerAlignContent();
+  row.setPadding(7, 10, 7, 10);
+  row.cornerRadius = 11;
+  if (live) {
+    row.backgroundGradient = heroGradient();
+  } else {
+    row.backgroundColor = new Color("#1C1C28", past ? 0.45 : 1);
+  }
+
+  const time = row.addStack();
+  time.layoutVertically();
+  time.size = new Size(38, 0);
+  addLine(time, shortLabel(b.start), Font.mediumSystemFont(10), live ? ACCENT_SOFT : DIM);
+
+  row.addSpacer(8);
+
+  const txt = row.addStack();
+  txt.layoutVertically();
+  addLine(txt, b.name, Font.semiboldSystemFont(12), past ? MUTED : TEXT);
+  const sub = subtitle(b);
+  if (sub) addLine(txt, sub, Font.systemFont(10), live ? new Color("#FFFFFF", 0.72) : MUTED);
+
+  row.addSpacer();
+
+  if (live) {
+    rightText(row, gapText(b.end - state.now), Font.semiboldSystemFont(11), WHITE);
+  } else if (b.room && !past) {
+    rightText(row, String(b.room), Font.systemFont(10), MUTED);
+  }
+
+  return row;
+}
+
+// ---------------------------------------------------------------- widgets
+
+function buildSmall(data, state) {
+  const w = new ListWidget();
+  w.backgroundColor = BG;
+  w.setPadding(12, 12, 12, 12);
+  dayHeader(w, data, true);
+  w.addSpacer(8);
+  heroCard(w, state, true);
+  w.addSpacer();
+  return w;
+}
+
+function buildMedium(data, state) {
+  const w = new ListWidget();
+  w.backgroundColor = BG;
+  w.setPadding(12, 13, 12, 13);
+  dayHeader(w, data, false);
+  w.addSpacer(8);
+
+  const cols = w.addStack();
+  cols.layoutHorizontally();
+  cols.spacing = 9;
+
+  const left = cols.addStack();
+  left.layoutVertically();
+  left.size = new Size(160, 0);
+  heroCard(left, state, true);
+
+  const right = cols.addStack();
+  right.layoutVertically();
+  right.spacing = 5;
+  const rest = state.upcoming.filter(b => !state.active || b.start !== state.active.start).slice(0, 3);
+  if (rest.length) {
+    rest.forEach(b => blockRow(right, b, state));
+  } else {
+    const empty = right.addStack();
+    empty.layoutVertically();
+    empty.setPadding(9, 10, 9, 10);
+    empty.cornerRadius = 11;
+    empty.backgroundColor = CARD;
+    addLine(empty, "Nothing left today", Font.systemFont(11), MUTED);
+  }
+  right.addSpacer();
+
+  return w;
+}
+
+function buildLarge(data, state) {
+  const w = new ListWidget();
+  w.backgroundColor = BG;
+  w.setPadding(14, 14, 14, 14);
+  dayHeader(w, data, false);
+  w.addSpacer(9);
+  heroCard(w, state, false);
+  w.addSpacer(9);
+
+  const idx = state.active
+    ? data.blocks.findIndex(b => b.start === state.active.start)
+    : data.blocks.findIndex(b => b.start > state.now);
+  const from = Math.max(0, (idx === -1 ? data.blocks.length : idx) - 1);
+  const rows = data.blocks.slice(from, from + 6);
+
+  const list = w.addStack();
+  list.layoutVertically();
+  list.spacing = 5;
+  rows.forEach(b => blockRow(list, b, state));
+
+  w.addSpacer();
+  return w;
+}
+
+function buildAccessory(data, state, family) {
+  const w = new ListWidget();
+
+  if (family === "accessoryCircular") {
+    const c = w.addStack();
+    c.layoutVertically();
+    c.centerAlignContent();
+    if (state.active) {
+      addLine(c, String(Math.max(0, Math.ceil(state.active.end - state.now))), Font.boldSystemFont(20), WHITE);
+      addLine(c, "min", Font.systemFont(9), WHITE);
+    } else if (state.next) {
+      addLine(c, String(Math.max(0, Math.ceil(state.next.start - state.now))), Font.boldSystemFont(20), WHITE);
+      addLine(c, "to go", Font.systemFont(9), WHITE);
+    } else {
+      addLine(c, "—", Font.boldSystemFont(20), WHITE);
+    }
+    return w;
+  }
+
+  if (family === "accessoryInline") {
+    if (state.active) addLine(w, state.active.name + " · " + gapText(state.active.end - state.now) + " left", Font.systemFont(12), WHITE);
+    else if (state.next) addLine(w, state.next.name + " in " + gapText(state.next.start - state.now), Font.systemFont(12), WHITE);
+    else addLine(w, "School's out", Font.systemFont(12), WHITE);
+    return w;
+  }
+
+  // accessoryRectangular
+  if (state.active) {
+    addLine(w, state.active.name, Font.boldSystemFont(14), WHITE);
+    const sub = subtitle(state.active);
+    if (sub) addLine(w, sub, Font.systemFont(11), WHITE);
+    addLine(w, gapText(state.active.end - state.now) + " left, ends " + clockLabel(state.active.end), Font.systemFont(11), WHITE);
+  } else if (state.next) {
+    addLine(w, "Next: " + state.next.name, Font.boldSystemFont(14), WHITE);
+    const sub = subtitle(state.next);
+    if (sub) addLine(w, sub, Font.systemFont(11), WHITE);
+    addLine(w, "Starts " + clockLabel(state.next.start) + ", in " + gapText(state.next.start - state.now), Font.systemFont(11), WHITE);
+  } else {
+    addLine(w, "School's out", Font.boldSystemFont(14), WHITE);
+    addLine(w, "No blocks left today", Font.systemFont(11), WHITE);
+  }
+  return w;
+}
+
+function buildError(message) {
+  const w = new ListWidget();
+  w.backgroundColor = BG;
+  w.setPadding(14, 14, 14, 14);
+  addLine(w, "Schedule unavailable", Font.semiboldSystemFont(13), new Color("#FF6B7A"));
+  w.addSpacer(4);
+  const t = w.addText(String(message).slice(0, 140));
+  t.font = Font.systemFont(11);
+  t.textColor = MUTED;
+  t.lineLimit = 4;
+  w.addSpacer(4);
+  addLine(w, "Tap to open the dashboard", Font.systemFont(10), DIM);
+  return w;
+}
+
+// ---------------------------------------------------------------- run
+
+let widget;
+const family = config.widgetFamily || "large";
+
+try {
+  const data = await loadSchedule();
+  const state = resolveNow(data);
+
+  if (family === "small") widget = buildSmall(data, state);
+  else if (family === "medium") widget = buildMedium(data, state);
+  else if (family.indexOf("accessory") === 0) widget = buildAccessory(data, state, family);
+  else widget = buildLarge(data, state);
+} catch (err) {
+  widget = buildError(err && err.message ? err.message : err);
+}
+
+// Tapping anywhere opens the controller dashboard.
+widget.url = SITE;
+widget.refreshAfterDate = new Date(Date.now() + 60 * 1000);
+
+if (config.runsInWidget) {
+  Script.setWidget(widget);
+} else {
+  if (family === "small") await widget.presentSmall();
+  else if (family === "medium") await widget.presentMedium();
+  else await widget.presentLarge();
+}
+
+Script.complete();

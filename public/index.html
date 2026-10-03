@@ -1,0 +1,143 @@
+<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>LGschedule: your Flex schedule on your lock screen</title>
+<style>
+:root{--bg:#0A0A12;--bd:rgba(255,255,255,.09);--ac:#8B5CF6;--ac2:#22D3EE;--tx:#ECEAF4;--mu:#9591AD;--ok:#5ee3a1;--warn:#F6C343;--bad:#ff6b7a}*{box-sizing:border-box}
+body{margin:0;color:var(--tx);font:16px/1.6 ui-sans-serif,-apple-system,"SF Pro Text",system-ui,sans-serif;
+ background:radial-gradient(900px 520px at 12% -8%,#3b1f8a66,transparent),radial-gradient(700px 420px at 95% 8%,#0e749045,transparent),var(--bg)}
+main{max-width:880px;margin:auto;padding:20px}.mu{color:var(--mu)}a{color:#B695FF}
+nav{display:flex;justify-content:space-between;align-items:center;padding:6px 0 28px;font-weight:700;letter-spacing:-.02em}nav b{background:linear-gradient(90deg,var(--ac),var(--ac2));-webkit-background-clip:text;color:transparent}
+h1{font-size:clamp(34px,7vw,60px);line-height:1.05;letter-spacing:-.03em;margin:.2em 0}h1 em{font-style:normal;background:linear-gradient(90deg,#B695FF,var(--ac2));-webkit-background-clip:text;color:transparent}
+h2{font-size:22px;letter-spacing:-.02em;margin:48px 0 14px}h3{margin:.2em 0;font-size:16px}
+.card{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:18px;padding:18px;backdrop-filter:blur(8px)}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.n{color:var(--ac2);font:700 12px ui-monospace,monospace}
+.term{background:#07070d;border:1px solid var(--bd);border-radius:14px;padding:16px;font:13px/1.6 ui-monospace,SFMono-Regular,monospace;overflow:auto;margin:0;white-space:pre}.ac{color:var(--ac2)}
+.pill{display:inline-block;border:1px solid var(--bd);border-radius:99px;padding:3px 12px;font-size:13px;color:var(--mu);margin:0 6px 6px 0}
+button{background:linear-gradient(135deg,#8B5CF6,#6D3FE0);color:#fff;border:0;border-radius:11px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}button.g{background:transparent;border:1px solid var(--bd);color:var(--mu)}
+input,textarea,pre.t{width:100%;background:#07070d;color:var(--tx);border:1px solid var(--bd);border-radius:11px;padding:10px;font:12px ui-monospace,monospace;margin:4px 0}pre.t{max-height:120px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.row{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-radius:11px;margin:4px 0;background:rgba(255,255,255,.04)}
+.live{background:linear-gradient(135deg,#251A46,#5B34B8)}.past{opacity:.45}.big{font-size:34px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.good{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}#app,#land{display:none}li{margin:4px 0}
+
+.tabs{display:flex;gap:6px;margin:8px 0}.tabs button{padding:6px 12px;font-size:13px}.tabs button.on{background:linear-gradient(135deg,#8B5CF6,#6D3FE0);color:#fff;border:0}
+.steps{display:flex;gap:8px;margin:14px 0}.stp{flex:1;border:1px solid var(--bd);border-radius:12px;padding:10px;font-size:13px;color:var(--mu)}.stp.done{border-color:#5ee3a155;color:var(--ok)}
+.phone{max-width:300px;margin:0 auto;background:#0E0E14;border:1px solid var(--bd);border-radius:26px;padding:16px}.ring{height:6px;border-radius:9px;background:#ffffff14;overflow:hidden;margin-top:8px}.ring i{display:block;height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2))}
+@keyframes pu{50%{opacity:.5}}.dot{display:inline-block;width:8px;height:8px;border-radius:9px;background:var(--ok);margin-right:6px;animation:pu 1.6s infinite}
+nav{position:sticky;top:0;z-index:5;backdrop-filter:blur(12px);background:#0A0A12cc;margin:0 -20px;padding:10px 20px}
+.card{transition:border-color .15s}.card:hover{border-color:#8B5CF655}button{transition:filter .15s}button:hover{filter:brightness(1.15)}
+@media(max-width:600px){.big{font-size:26px}main{padding:14px}nav{margin:0 -14px;padding:10px 14px}}
+</style>
+<style>
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes flow{0%{background-position:0 50%}100%{background-position:200% 50%}}
+@keyframes bob{50%{transform:translateY(-8px)}}
+@keyframes glow{50%{box-shadow:0 0 0 6px #8B5CF622,0 8px 30px #8B5CF633}}
+@keyframes shine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+main>div>*,#app>*{animation:up .6s cubic-bezier(.2,.7,.2,1) both}
+main>div>*:nth-child(2){animation-delay:.08s}main>div>*:nth-child(3){animation-delay:.16s}main>div>*:nth-child(4){animation-delay:.24s}main>div>*:nth-child(n+5){animation-delay:.32s}
+.grid>.card{animation:up .6s both}.grid>.card:nth-child(2){animation-delay:.1s}.grid>.card:nth-child(3){animation-delay:.2s}
+h1 em{background-size:200% auto;animation:flow 6s linear infinite}
+.card{transition:transform .25s,border-color .25s,box-shadow .25s}.card:hover{transform:translateY(-3px);box-shadow:0 14px 40px #8B5CF622}
+.phone{animation:bob 5s ease-in-out infinite,glow 4s ease-in-out infinite}
+button{transition:transform .15s,filter .15s,box-shadow .2s;box-shadow:0 4px 14px #6D3FE044}button:hover{transform:translateY(-1px)}button:active{transform:scale(.96)}
+.row{transition:background .2s,transform .2s}.row:hover{background:rgba(255,255,255,.08);transform:translateX(3px)}
+.live{animation:glow 3s ease-in-out infinite}.ring i{transition:width .8s cubic-bezier(.2,.7,.2,1);position:relative;overflow:hidden}.ring i:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#fff6,transparent);animation:shine 2s infinite}
+input:focus,textarea:focus{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px #8B5CF633}input,textarea{transition:border-color .2s,box-shadow .2s}
+.stp{transition:all .3s}.stp.done{box-shadow:0 0 18px #5ee3a122}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<main>
+<div id=land>
+ <nav><span><b>LG</b>schedule</span><span class=mu style="font-weight:500">for Flex</span></nav>
+ <h1>Your Flex schedule, <em>always on your lock screen.</em></h1>
+ <p class=mu style="max-width:560px;font-size:18px">LGschedule turns the new Flex system into a live widget and a private controller: what class is now, what's next, and how long's left. Free for students.</p>
+ <div id=g style="margin:22px 0 6px"></div><p id=err class=bad></p>
+ <h2>How it works</h2>
+ <div class=grid>
+  <div class=card><div class=n>01</div><h3>Sign in with Google</h3><p class=mu>Sign in with any Google account. Your profile, token and controller settings are saved, so signing in again on any device brings it all back.</p></div>
+  <div class=card><div class=n>02</div><h3>Import your Flex token</h3><p class=mu>A guided 2-minute walkthrough. We show a live countdown until it expires.</p></div>
+  <div class=card><div class=n>03</div><h3>Get your widget</h3><p class=mu>We generate your own Scriptable script and a controller only you can open.</p></div></div>
+ <h2>See it work</h2>
+ <div class=grid style="align-items:center"><div class=phone><div class=mu style="font-size:12px"><span class=dot></span>Live preview · A day</div><div class=big style="font-size:26px;margin-top:6px">Block 3</div><div class=mu>Environmental Sci · Room 010</div>
+  <div class=big style="color:#B695FF;margin-top:8px">23m <span class=mu style="font-size:13px;font-weight:500">left, ends 10:44</span></div><div class=ring><i style="width:58%"></i></div><div class=row style="margin-top:12px"><span>10:47 · Flex</span><span class=mu>LIB1</span></div></div>
+  <div class=card><h3>Flex → LGschedule → you</h3><p class=mu>Sign in with Google, import your token, and your phone shows the current class, the countdown, and what's next, on the lock screen and in a private web controller that only you can open.</p></div></div>
+ <h2>The API, in one request</h2>
+ <pre class=term><span class=mu>GET</span> /api/w/<span class=ac>your-private-link</span>
+
+{ "letter_day": "B",
+  "all_blocks": [
+    { "name": "Block 3", "start": "10:05", "end": "11:00",
+      "classes": [{ "title": "AP Physics", "room": "214" }] } ] }</pre>
+ <p class=mu>Flex → LGschedule → your lock screen. Your widget calls your private link every minute; we fetch from Flex (cached 30s) and hand back clean JSON.</p>
+ <h2>Privacy, plainly</h2>
+ <div class=card><span class=pill>No passwords</span><span class=pill>Google sign-in only</span><span class=pill>Token encrypted (AES-256)</span><span class=pill>Delete anytime</span>
+  <p class=mu>We never see or store a password. To fetch your schedule we do keep three things: your name and school email, your Flex session token (encrypted), and when it expires. Your schedule itself is never saved: it is fetched live and held in memory for 30 seconds. We don't read grades, messages, or anything else. Debug logs (with your name, never your token) are kept for about 24 hours. Only you can open your controller and script, and one click in your dashboard deletes everything we hold.</p></div>
+ <p class=mu style="margin:40px 0 20px;font-size:13px">Student-made. Not affiliated with Flex or the school.</p>
+</div>
+<div id=app></div>
+</main>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),$=s=>document.querySelector(s);let S=null,ME=null,gInit=false;
+const m=t=>{let[h,n]=t.split(':');h=+h;if(h<6)h+=12;return h*60+ +n},
+ fmt=x=>{const h=Math.floor(x/60);return(h%12||12)+':'+String(x%60).padStart(2,'0')},
+ gap=x=>{const n=Math.max(0,Math.ceil(x));return n>=60?Math.floor(n/60)+'h '+n%60+'m':n+'m'},
+ f=async(p,b)=>{const r=await fetch('/api/'+p,{method:b?'POST':'GET',headers:{'content-type':'application/json'},body:b?JSON.stringify(b):undefined}),
+  j=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(j.error||('Server returned '+r.status+' for /api/'+p)),{s:r.status});return j};
+async function boot(){try{ME=await f('me');$('#land').style.display='none';$('#app').style.display='block';dash()}
+ catch(e){$('#app').style.display='none';$('#land').style.display='block';if(!gInit){gInit=true;landing()}}}
+async function landing(){const c=await f('config');if(!c.clientId){$('#err').textContent='Site not configured yet: GOOGLE_CLIENT_ID is missing in Vercel.';return}const w=setInterval(()=>{if(!window.google)return;clearInterval(w);
+ google.accounts.id.initialize({client_id:c.clientId,hd:c.domain,callback:async r=>{for(let n=0;n<2;n++){try{await f('auth/google',{credential:r.credential});$('#err').textContent='';boot();return}catch(e){if(n===0&&(e.s===404||e.s>=500)){await new Promise(x=>setTimeout(x,1200));continue}$('#err').textContent=e.message;return}}}});
+ google.accounts.id.renderButton($('#g'),{theme:'filled_black',size:'large',text:'continue_with',shape:'pill'})},200)}
+function dash(){$('#app').innerHTML=`
+<nav><span><b>LG</b>schedule</span><span>${esc(ME.name)} · ${ME.isAdmin?'<a href=/admin.html>Admin</a> · ':''}<a href=# id=out>Sign out</a></span></nav>
+<div class=card><div style="display:flex;justify-content:space-between;gap:8px"><span class=mu>Your Flex token expires in</span><span class=pill id=pl style="margin:0"></span></div><div class="big mu" id=cd>Not imported yet</div><div class=mu id=cdd></div></div>
+<h2>1 · Import your Flex token</h2><div class=card><div class=steps><div class="stp done">✓ Signed in</div><div class="stp ${ME.hasCookie?'done':''}">${ME.hasCookie?'✓':'2'} Token imported</div><div class=stp>3 Add widget</div></div>
+ <div class=tabs id=tb><button class=on data-b=c>Chrome / Edge / Chromebook</button><button class=g data-b=s>Safari (Mac)</button><button class=g data-b=f>Firefox</button></div>
+ <p class=mu id=bt></p><ol class=mu>
+ <li>On a computer, sign in at <a href="https://flex.lkgeorge.org/schedule" target=_blank>flex.lkgeorge.org/schedule</a>.</li>
+ <li>Open DevTools: <b>F12</b> → <b>Application</b> tab → Cookies → flex.lkgeorge.org. (Safari: Settings → Advanced → Show Develop menu, then ⌥⌘I → Storage → Cookies.)</li>
+ <li>Find <b>__Secure-authjs.session-token</b> (the Value starts with <code>eyJ</code>; ignore the one starting with <code>https%3A</code>). Click it and copy the <b>Cookie Value</b> box at the bottom.</li><li>Also copy its <b>Expires</b> date from the Expires column (widen the column if it is cut off), like <code>2026-11-01T18:26:09.739Z</code>.</li><li>Paste both below.</li></ol><img src=/tutorial-cookie.png onerror="this.style.display='none'" alt="DevTools Application tab with the session-token cookie selected" style="width:100%;border-radius:12px;border:1px solid var(--bd);margin:6px 0 10px">
+ <textarea id=tk rows=3 placeholder="Value of __Secure-authjs.session-token"></textarea><input id=ex placeholder="Expires, e.g. 2026-11-01T18:26:09.739Z">
+ <p><button id=sv>Save &amp; verify</button> <span id=st class=mu></span></p></div>
+<h2>2 · Your controller</h2><div class=card id=ctl><span class=mu>Import your token to see your schedule.</span></div>
+<h2>3 · Control your widget</h2><div class=card><p class=mu>Your widget reads these settings every time it refreshes, so changes here show on your phone within a minute. No re-pasting.</p>
+ <div class=mu>Show a different day</div><div style="display:flex;gap:8px;flex-wrap:wrap"><input type=date id=od style="width:auto"><button id=so>Show this day</button><button class=g id=bl>Back to live</button></div>
+ <div class=mu style="margin-top:12px"><label><input type=checkbox id=lo style="width:auto"> Show a lunch block</label></div><div style="display:flex;gap:8px;flex-wrap:wrap"><input type=time id=ls style="width:auto"><input type=time id=le style="width:auto"><button id=sl>Save lunch</button></div>
+ <p class=mu id=os></p></div>
+<h2>4 · Your Scriptable widget</h2><div class=card><p class=mu>Private to you. Don't share this script.</p><pre class=t id=sc>Import your token first.</pre>
+ <p><button id=cp>Copy my script</button> <button class=g id=rg>Reset my link</button></p><h3 style="margin-top:14px">Set it up on your iPhone</h3><ol class=mu>
+ <li>Install <b>Scriptable</b> (free) from the App Store.</li><li>Tap <b>Copy my script</b> above. Open Scriptable, tap <b>+</b>, paste, and name it "Schedule".</li>
+ <li><b>Lock screen</b> (iOS 16+): long-press the lock screen → Customize → Lock Screen → tap the row under the time → Scriptable → pick "Schedule". Use the rectangular widget for class + time left.</li>
+ <li><b>Home screen:</b> long-press → + → Scriptable (Medium or Large) → tap it → Script: Schedule.</li>
+ <li><b>Not updating?</b> Tap the widget once to refresh. If it says token expired, re-import your token above.</li></ol></div>
+<p style="margin:36px 0"><button class=g id=del>Delete my account &amp; data</button></p>`;
+ const BT={c:'Press <b>F12</b> (or Ctrl+Shift+I), open the <b>Application</b> tab, then Cookies → flex.lkgeorge.org.',s:'Safari → Settings → Advanced → tick "Show features for web developers". Then press ⌥⌘I → <b>Storage</b> tab → Cookies. Safari shows the Expires date in the same table.',f:'Press <b>F12</b>, open the <b>Storage</b> tab → Cookies → flex.lkgeorge.org.'};
+ const bt=k=>{$('#bt').innerHTML=BT[k];document.querySelectorAll('#tb button').forEach(b=>b.className=b.dataset.b===k?'on':'g')};bt('c');document.querySelectorAll('#tb button').forEach(b=>b.onclick=()=>bt(b.dataset.b));
+ $('#out').onclick=async e=>{e.preventDefault();await f('auth/logout',{});boot()};
+ $('#sv').onclick=async()=>{$('#st').textContent='Checking with Flex…';try{const r=await f('cookie',{token:$('#tk').value,expires:$('#ex').value});
+  $('#tk').value=$('#ex').value='';ME.hasCookie=true;ME.expires=r.expires;$('#st').className='mu good';$('#st').textContent='Saved ✓';load();script();cd()}catch(e){$('#st').className='mu bad';$('#st').textContent=e.message}};
+ const fillCtl=()=>{$('#od').value=ME.override_date||'';$('#lo').checked=ME.lunch_on;$('#ls').value=ME.lunch_start;$('#le').value=ME.lunch_end;$('#os').textContent=ME.override_date?'Widget is locked to '+ME.override_date+'. Press Back to live to return to today.':'Widget is live (shows today).'};
+ const sv2=async b=>{try{Object.assign(ME,await f('settings',b));fillCtl();$('#os').textContent+=' Saved ✓';load()}catch(e){$('#os').textContent=e.message}};
+ $('#so').onclick=()=>$('#od').value?sv2({override_date:$('#od').value}):($('#os').textContent='Pick a date first.');$('#bl').onclick=()=>sv2({override_date:null});
+ $('#sl').onclick=()=>sv2({lunch_on:$('#lo').checked,lunch_start:$('#ls').value,lunch_end:$('#le').value});fillCtl();
+ $('#cp').onclick=()=>navigator.clipboard.writeText($('#sc').textContent).then(()=>$('#cp').textContent='Copied ✓');
+ $('#rg').onclick=async()=>{if(confirm('Old widgets stop working until you paste the new script.')){await f('token',{});script()}};
+ $('#del').onclick=async()=>{if(confirm('Delete your profile, token and script link? This cannot be undone.')){await f('delete',{});boot()}};
+ if(ME.status==='expired')$('#st').textContent='Your token expired. Import a new one.';
+ if(ME.hasCookie){load();script()}cd()}
+function cd(){const pl=$('#pl');if(pl)pl.textContent=!ME.hasCookie?'No token yet':(ME.expires&&Date.parse(ME.expires)<Date.now())?'Expired':'● Active · saved to your profile';const el=$('#cd');if(!el||!ME.expires)return;const s=Math.floor((Date.parse(ME.expires)-Date.now())/1000);
+ if(s<=0){el.textContent='Expired';el.className='big bad';$('#cdd').textContent='Import a new token to bring your widget back.';return}
+ const p=n=>String(n).padStart(2,'0');el.textContent=`${Math.floor(s/86400)}d ${p(Math.floor(s%86400/3600))}h ${p(Math.floor(s%3600/60))}m ${p(s%60)}s`;
+ el.className='big '+(s<86400?'bad':s<604800?'warn':'good');$('#cdd').textContent='Expires '+new Date(ME.expires).toLocaleString()+(s<604800?'. Re-import soon.':'')}
+async function script(){const r=await fetch('/api/script');$('#sc').textContent=await r.text()}
+async function load(){try{S=await f('schedule');draw()}catch(e){$('#ctl').textContent=e.message}}
+function carve(l){const LU=S&&S.lunch!==undefined?S.lunch:{start:'12:13',end:'12:43'};if(!LU)return l;const ls=m(LU.start),le=m(LU.end);if(!l.length||l.some(b=>/lunch/i.test(b.name)||b.s===ls)||ls<l[0].s||le>l[l.length-1].e)return l;
+ const o=[];let p=false;const lu={name:'Lunch',s:ls,e:le,classes:[]};l.forEach(b=>{if(b.s>=le||b.e<=ls){o.push(b);return}
+  if(ls-b.s>=2)o.push({...b,e:ls});if(!p){o.push(lu);p=true}if(b.e-le>=2)o.push({...b,s:le})});if(!p)o.push(lu);return o.sort((a,b)=>a.s-b.s)}
+function draw(){if(!S||!$('#ctl'))return;const d=new Date(),now=d.getHours()*60+d.getMinutes()+d.getSeconds()/60,
+ bs=carve(S.all_blocks.map(b=>({...b,s:m(b.start),e:m(b.end)}))),a=bs.find(b=>now>=b.s&&now<b.e),n=bs.find(b=>b.s>now),
+ hero=a?`<div class=mu>In session</div><div class=big>${esc(a.name)}</div><div>${gap(a.e-now)} left · ends ${fmt(a.e)}</div>`
+ :n?`<div class=mu>Up next</div><div class=big>${esc(n.name)}</div><div>in ${gap(n.s-now)} · ${fmt(n.s)}</div>`:`<div class=big>School's out</div>`;
+ $('#ctl').innerHTML=`<div class=mu>${esc(S.letter_day)} ${esc(S.date)}</div>${hero}<div style="margin-top:10px">`+bs.map(b=>{const c=(b.classes||[])[0]||{};
+  return`<div class="row ${b===a?'live':''} ${now>=b.e?'past':''}"><span>${fmt(b.s)} · ${esc(b.name)}${c.title?' · '+esc(c.title.replace(/\s*\([^)]*\)|\s*SN:\S+|\s*Per:\S+/g,'')):''}</span><span class=mu>${esc(c.room)}</span></div>`}).join('')+'</div>'}
+setInterval(()=>{cd();draw()},1000);setInterval(()=>ME&&ME.hasCookie&&load(),20000);boot();
+</script></html>
